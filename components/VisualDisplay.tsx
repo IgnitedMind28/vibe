@@ -140,18 +140,26 @@ function buildParticles(scene: SceneConfig, seed: number, baseDuration: number):
 
 function getAnimationSpeeds(track: NowPlayingTrack) {
   const { tempo, energy, danceability } = track
+  // 1 beat = 1 full bounce cycle
   const beatSec = 60 / (tempo || 120)
-  const charDuration = Math.max(0.45, Math.min(2.8, beatSec * 2))
-  const particleDuration = Math.max(2.5, 8 - energy * 5)
-  const bgDuration = Math.max(2, 7 - energy * 4)
+  const charDuration = Math.max(0.3, Math.min(2.0, beatSec))
 
-  let charAnim: 'Bounce' | 'Dance' | 'Wobble' | 'Pulse'
-  if (energy > 0.72 && danceability > 0.65) charAnim = 'Dance'
-  else if (energy > 0.58)                   charAnim = 'Bounce'
-  else if (energy < 0.32)                   charAnim = 'Pulse'
-  else                                       charAnim = 'Wobble'
+  // Bounce height: barely moves when calm, big jumps when energetic
+  const bounceH  = Math.round(energy * 68)          // 0–68px
+  const squishY  = +(1 - energy * 0.20).toFixed(3)  // scaleY on landing (squish)
+  const stretchY = +(1 + energy * 0.24).toFixed(3)  // scaleY at peak (stretch)
+  const squishX  = +(1 / squishY).toFixed(3)
+  const stretchX = +(1 / stretchY).toFixed(3)
 
-  return { charDuration, particleDuration, bgDuration, charAnim }
+  const particleDuration = Math.max(1.2, 5 - energy * 3.5)
+  const bgDuration = Math.max(1.5, 5 - energy * 3)
+
+  let charAnim: 'Bounce' | 'Dance' | 'Pulse'
+  if (energy < 0.25)                            charAnim = 'Pulse'
+  else if (energy > 0.68 && danceability > 0.6) charAnim = 'Dance'
+  else                                           charAnim = 'Bounce'
+
+  return { charDuration, bounceH, squishY, squishX, stretchY, stretchX, particleDuration, bgDuration, charAnim }
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -167,50 +175,54 @@ export default function VisualDisplay({ track }: Props) {
 
   if (!track || !scene || !speeds) return <div className="fixed inset-0 bg-black" />
 
-  const { charDuration, bgDuration, charAnim } = speeds
+  const { charDuration, bounceH, squishY, squishX, stretchY, stretchX, bgDuration, charAnim } = speeds
+  const halfH = Math.round(bounceH * 0.55)
 
   return (
     <div className="fixed inset-0 overflow-hidden select-none">
       <style>{`
+        /* Beat-synced bounce with squish & stretch */
         @keyframes charBounce {
-          0%,100% { transform: translateY(0) scale(1) rotate(-2deg); }
-          25%      { transform: translateY(-22px) scale(1.09) rotate(2deg); }
-          50%      { transform: translateY(-10px) scale(1.04) rotate(-1deg); }
-          75%      { transform: translateY(-26px) scale(1.11) rotate(3deg); }
+          0%,100% { transform: translateY(0)       scaleY(${squishY}) scaleX(${squishX}); }
+          12%      { transform: translateY(0)       scaleY(1)          scaleX(1); }
+          45%,55%  { transform: translateY(-${bounceH}px) scaleY(${stretchY}) scaleX(${stretchX}); }
+          88%      { transform: translateY(0)       scaleY(1)          scaleX(1); }
         }
         @keyframes charDance {
-          0%   { transform: translateY(0)    rotate(-6deg) scaleX(1);    }
-          20%  { transform: translateY(-18px) rotate(6deg) scaleX(0.94); }
-          40%  { transform: translateY(-28px) rotate(-9deg) scaleX(1.06);}
-          60%  { transform: translateY(-12px) rotate(7deg) scaleX(0.96); }
-          80%  { transform: translateY(-22px) rotate(-5deg) scaleX(1.04);}
-          100% { transform: translateY(0)    rotate(-6deg) scaleX(1);    }
-        }
-        @keyframes charWobble {
-          0%,100% { transform: translateY(0) rotate(-2deg); }
-          50%      { transform: translateY(-12px) rotate(2deg); }
+          0%   { transform: translateY(0)          rotate(-8deg)  scaleX(1);    }
+          18%  { transform: translateY(-${halfH}px) rotate(8deg)  scaleX(0.88); }
+          38%  { transform: translateY(-${bounceH}px) rotate(-11deg) scaleX(${stretchX}); }
+          58%  { transform: translateY(-${halfH}px) rotate(11deg) scaleX(0.9);  }
+          78%  { transform: translateY(-${Math.round(bounceH*0.7)}px) rotate(-7deg) scaleX(1.05); }
+          100% { transform: translateY(0)          rotate(-8deg)  scaleX(1);    }
         }
         @keyframes charPulse {
-          0%,100% { transform: scale(1);    opacity: 0.9; }
-          50%      { transform: scale(1.09); opacity: 1;   }
+          0%,100% { transform: scale(1);    opacity: 0.85; }
+          50%      { transform: scale(${1 + (speeds.stretchY - 1) * 0.5}); opacity: 1; }
+        }
+        @keyframes popUp {
+          0%   { transform: translateY(30px) scale(0) rotate(-20deg); opacity:0; }
+          50%  { transform: translateY(-8px)  scale(1.3) rotate(5deg);  opacity:1; }
+          70%  { transform: translateY(2px)   scale(0.92) rotate(-2deg); opacity:1; }
+          100% { transform: translateY(-60px) scale(0.7) rotate(10deg);  opacity:0; }
         }
         @keyframes float1 {
-          0%,100% { transform: translateY(0)    translateX(0)    rotate(0deg);  }
-          33%      { transform: translateY(-22px) translateX(10px) rotate(12deg); }
-          66%      { transform: translateY(-10px) translateX(-8px) rotate(-6deg); }
+          0%,100% { transform: translateY(0)    translateX(0)    rotate(0deg);   }
+          33%      { transform: translateY(-24px) translateX(10px) rotate(13deg); }
+          66%      { transform: translateY(-10px) translateX(-8px) rotate(-7deg); }
         }
         @keyframes float2 {
           0%,100% { transform: translateY(0)    translateX(0)     rotate(0deg); opacity:.8; }
-          50%      { transform: translateY(-32px) translateX(-14px) rotate(16deg); opacity:1; }
+          50%      { transform: translateY(-34px) translateX(-14px) rotate(17deg); opacity:1; }
         }
         @keyframes float3 {
           0%,100% { transform: scale(1)    rotate(0deg);  opacity:.7; }
-          25%      { transform: scale(1.16) rotate(9deg);  opacity:.9; }
-          75%      { transform: scale(0.86) rotate(-9deg); opacity:1;  }
+          25%      { transform: scale(1.18) rotate(10deg); opacity:.9; }
+          75%      { transform: scale(0.84) rotate(-10deg); opacity:1; }
         }
         @keyframes bgPulse {
-          0%,100% { opacity:.92; }
-          50%      { opacity:1;   }
+          0%,100% { opacity:.9; }
+          50%      { opacity:1;  }
         }
         @keyframes horizonSway {
           0%,100% { transform: rotate(-2deg); }
@@ -227,23 +239,28 @@ export default function VisualDisplay({ track }: Props) {
         }}
       />
 
-      {/* Layer 2: Floating particles */}
-      {particles.map((p, i) => (
-        <span
-          key={i}
-          className="absolute pointer-events-none"
-          style={{
-            left: `${p.x}%`,
-            top: `${p.y}%`,
-            fontSize: `${p.size}px`,
-            lineHeight: 1,
-            animation: `float${p.variant} ${p.duration.toFixed(2)}s ease-in-out ${p.delay.toFixed(2)}s infinite`,
-            willChange: 'transform',
-          }}
-        >
-          {p.emoji}
-        </span>
-      ))}
+      {/* Layer 2: Floating particles — popUp for high energy, float otherwise */}
+      {particles.map((p, i) => {
+        const usePopUp = track.energy > 0.65 && i % 3 === 0
+        return (
+          <span
+            key={i}
+            className="absolute pointer-events-none"
+            style={{
+              left: `${p.x}%`,
+              top: usePopUp ? '90%' : `${p.y}%`,
+              fontSize: `${p.size}px`,
+              lineHeight: 1,
+              animation: usePopUp
+                ? `popUp ${p.duration.toFixed(2)}s ease-out ${p.delay.toFixed(2)}s infinite`
+                : `float${p.variant} ${p.duration.toFixed(2)}s ease-in-out ${p.delay.toFixed(2)}s infinite`,
+              willChange: 'transform',
+            }}
+          >
+            {p.emoji}
+          </span>
+        )
+      })}
 
       {/* Layer 3: Horizon decoration */}
       <div className="absolute bottom-0 left-0 right-0 flex justify-around items-end pb-2" style={{ height: '18vh' }}>
@@ -261,8 +278,9 @@ export default function VisualDisplay({ track }: Props) {
         ))}
       </div>
 
-      {/* Layer 4: Main character */}
+      {/* Layer 4: Main character — re-mounts on each track for pop-in */}
       <div
+        key={track.trackId}
         className="absolute pointer-events-none"
         role="img"
         aria-label={scene.characterLabel}
