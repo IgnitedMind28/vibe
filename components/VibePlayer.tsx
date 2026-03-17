@@ -6,7 +6,7 @@ import VisualDisplay from './VisualDisplay'
 import NowPlayingOverlay from './NowPlayingOverlay'
 
 export default function VibePlayer() {
-  const { track, imageUrl, isLoading, isConnected, error } = useNowPlaying()
+  const { track, isConnected, error } = useNowPlaying()
 
   const enterFullscreen = useCallback(() => {
     document.documentElement.requestFullscreen?.()
@@ -14,8 +14,8 @@ export default function VibePlayer() {
 
   return (
     <>
-      <VisualDisplay imageUrl={imageUrl} isLoading={isLoading} />
-      <NowPlayingOverlay track={track} isLoading={isLoading} />
+      <VisualDisplay track={track} />
+      <NowPlayingOverlay track={track} isLoading={false} />
 
       {/* Fullscreen button — fades out when a visual is showing */}
       <button

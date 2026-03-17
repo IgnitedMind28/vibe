@@ -5,8 +5,6 @@ import type { NowPlayingTrack } from '@/lib/spotify'
 
 export interface NowPlayingState {
   track: NowPlayingTrack | null
-  imageUrl: string | null
-  isLoading: boolean
   isConnected: boolean
   error: string | null
 }
@@ -15,8 +13,6 @@ const POLL_INTERVAL_MS = 5000
 
 export function useNowPlaying(): NowPlayingState {
   const [track, setTrack] = useState<NowPlayingTrack | null>(null)
-  const [imageUrl, setImageUrl] = useState<string | null>(null)
-  const [isLoading, setIsLoading] = useState(false)
   const [isConnected, setIsConnected] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const lastTrackId = useRef<string | null>(null)
@@ -24,23 +20,6 @@ export function useNowPlaying(): NowPlayingState {
   const refreshToken = useCallback(async (): Promise<boolean> => {
     const res = await fetch('/api/spotify/refresh', { method: 'POST' })
     return res.ok
-  }, [])
-
-  const fetchVisual = useCallback(async (t: NowPlayingTrack) => {
-    setIsLoading(true)
-    try {
-      const res = await fetch('/api/generate-visual', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(t),
-      })
-      if (res.ok) {
-        const data = await res.json()
-        setImageUrl(data.imageUrl)
-      }
-    } finally {
-      setIsLoading(false)
-    }
   }, [])
 
   const poll = useCallback(async () => {
@@ -70,19 +49,18 @@ export function useNowPlaying(): NowPlayingState {
 
       if (!incoming) {
         setTrack(null)
+        lastTrackId.current = null
         return
       }
 
-      setTrack(incoming)
-
       if (incoming.trackId !== lastTrackId.current) {
         lastTrackId.current = incoming.trackId
-        fetchVisual(incoming)
+        setTrack(incoming)
       }
     } catch {
       setError('Network error')
     }
-  }, [refreshToken, fetchVisual])
+  }, [refreshToken])
 
   useEffect(() => {
     poll()
@@ -90,5 +68,5 @@ export function useNowPlaying(): NowPlayingState {
     return () => clearInterval(id)
   }, [poll])
 
-  return { track, imageUrl, isLoading, isConnected, error }
+  return { track, isConnected, error }
 }
