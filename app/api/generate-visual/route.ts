@@ -45,8 +45,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to generate prompt', detail: String(err) }, { status: 500 })
   }
 
+  // Strip special characters that cause pollinations.ai to fail
+  const safePrompt = prompt.replace(/[—–""''…]/g, ' ').replace(/\s+/g, ' ').trim()
+
   const seed = trackIdToSeed(trackId)
-  const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1920&height=1080&model=flux&nologo=true&seed=${seed}`
+  const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(safePrompt)}?width=1280&height=720&model=flux&nologo=true&seed=${seed}`
 
   cache.set(trackId, imageUrl)
 
