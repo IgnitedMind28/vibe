@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { generateImagePrompt } from '@/lib/claude'
 
+export const maxDuration = 30
+
 // Simple in-memory cache keyed by trackId
 const cache = new Map<string, string>()
 
@@ -26,16 +28,22 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ imageUrl: cache.get(trackId) })
   }
 
-  const prompt = await generateImagePrompt({
-    title,
-    artist,
-    album: album ?? '',
-    genres: genres ?? [],
-    tempo: tempo ?? 120,
-    energy: energy ?? 0.5,
-    valence: valence ?? 0.5,
-    danceability: danceability ?? 0.5,
-  })
+  let prompt: string
+  try {
+    prompt = await generateImagePrompt({
+      title,
+      artist,
+      album: album ?? '',
+      genres: genres ?? [],
+      tempo: tempo ?? 120,
+      energy: energy ?? 0.5,
+      valence: valence ?? 0.5,
+      danceability: danceability ?? 0.5,
+    })
+  } catch (err) {
+    console.error('[generate-visual] Claude error:', err)
+    return NextResponse.json({ error: 'Failed to generate prompt', detail: String(err) }, { status: 500 })
+  }
 
   const seed = trackIdToSeed(trackId)
   const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1920&height=1080&nologo=true&seed=${seed}`
