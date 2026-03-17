@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
   }
 
   const seed = trackIdToSeed(trackId)
-  const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1920&height=1080&nologo=true&seed=${seed}`
+  const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1920&height=1080&model=flux&nologo=true&seed=${seed}`
 
   cache.set(trackId, imageUrl)
 
